@@ -423,18 +423,33 @@ NodeManager.prototype.resizeCanvas = function() {
     if (container) {
         // Get container dimensions
         const containerRect = container.getBoundingClientRect();
-        const containerWidth = containerRect.width - 20; // Leave some padding
-        const containerHeight = containerRect.height - 20; // Leave some padding
         
-        // Set minimum dimensions
-        const minWidth = 600;
-        const minHeight = 400;
+        let containerWidth, containerHeight;
         
-        // Calculate canvas dimensions
-        this.canvas.width = Math.max(containerWidth, minWidth);
-        this.canvas.height = Math.max(containerHeight, minHeight);
+        if (this.isMobile) {
+            // Mobile: use full container with minimal padding
+            containerWidth = containerRect.width - 10;
+            containerHeight = containerRect.height - 10;
+            
+            // Set mobile-friendly minimum dimensions
+            const minWidth = 300;
+            const minHeight = 250;
+            
+            this.canvas.width = Math.max(containerWidth, minWidth);
+            this.canvas.height = Math.max(containerHeight, minHeight);
+        } else {
+            // Desktop: use original logic
+            containerWidth = containerRect.width - 20;
+            containerHeight = containerRect.height - 20;
+            
+            const minWidth = 600;
+            const minHeight = 400;
+            
+            this.canvas.width = Math.max(containerWidth, minWidth);
+            this.canvas.height = Math.max(containerHeight, minHeight);
+        }
         
-        console.log(`Canvas resized to: ${this.canvas.width}x${this.canvas.height}`);
+        console.log(`Canvas resized to: ${this.canvas.width}x${this.canvas.height} (${this.isMobile ? 'Mobile' : 'Desktop'})`);
     }
 };
 
@@ -1131,6 +1146,26 @@ document.addEventListener('DOMContentLoaded', function() {
         // Make node_manager globally accessible for debugging
         window.nodeManager = node_manager;
         
+        // Force canvas resize on mobile after initialization
+        if (isMobile) {
+            setTimeout(() => {
+                console.log("Force resizing mobile canvas...");
+                node_manager.resizeCanvas();
+                node_manager.draw();
+            }, 200);
+            
+            // Also resize when the controls panel is toggled
+            const mobileControls = document.getElementById('mobileControls');
+            if (mobileControls) {
+                const observer = new MutationObserver(() => {
+                    setTimeout(() => {
+                        node_manager.resizeCanvas();
+                        node_manager.draw();
+                    }, 100);
+                });
+                observer.observe(mobileControls, { attributes: true, attributeFilter: ['class'] });
+            }
+        }
     } catch (error) {
         console.error("Error during initialization:", error);
     }
