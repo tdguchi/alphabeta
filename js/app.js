@@ -188,7 +188,14 @@ Node.prototype.getNodeAtPosition = function(x, y) {
     var dy = y - this.pos[1];
     var distance = Math.sqrt(dx * dx + dy * dy);
     
-    if (distance <= Node.radius) {
+    // Increase touch area for mobile devices
+    var touchRadius = Node.radius;
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        // Mobile device - increase touch area by 50%
+        touchRadius = Node.radius * 1.5;
+    }
+    
+    if (distance <= touchRadius) {
         return this;
     }
     
@@ -297,6 +304,7 @@ function NodeManager(canvasID) {
         setTimeout(() => this.draw(), 100);
     });
     this.canvas.addEventListener("mousedown", this.onMouseClick.bind(this));
+    this.canvas.addEventListener("touchstart", this.onTouchStart.bind(this));
     
     document.getElementById("run").addEventListener("click", this.run.bind(this));
     document.getElementById("step").addEventListener("click", this.step.bind(this));
@@ -408,20 +416,32 @@ NodeManager.prototype.showInlineEditor = function(node, x, y) {
     input.style.position = 'fixed';
     input.style.left = finalX + 'px';
     input.style.top = finalY + 'px';
-    input.style.width = '80px';
-    input.style.height = '32px';
     input.style.zIndex = '99999';
     input.style.display = 'block';
     input.style.backgroundColor = 'rgba(255, 255, 255, 0.98)';
     input.style.border = '2px solid #343a40';
     input.style.borderRadius = '8px';
-    input.style.fontSize = '14px';
+    input.style.fontSize = '16px'; // Larger font for mobile
     input.style.textAlign = 'center';
     input.style.fontWeight = 'bold';
     input.style.boxShadow = '0 4px 20px rgba(52, 58, 64, 0.3)';
     input.style.backdropFilter = 'blur(10px)';
     input.style.outline = 'none';
     input.style.transition = 'all 0.2s ease';
+    
+    // Mobile-specific adjustments
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        input.style.width = '100px'; // Wider for touch
+        input.style.height = '44px'; // Standard iOS touch target
+        input.style.fontSize = '18px'; // Even larger font for mobile
+        input.style.padding = '8px';
+        // Prevent zoom on iOS
+        input.style.webkitUserSelect = 'none';
+        input.style.webkitTouchCallout = 'none';
+    } else {
+        input.style.width = '80px';
+        input.style.height = '32px';
+    }
     
     document.body.appendChild(input);
     console.log("Input element added to body:", input);
@@ -469,6 +489,30 @@ NodeManager.prototype.showInlineEditor = function(node, x, y) {
     });
     
     input.addEventListener('blur', handleSave);
+    
+    // Additional touch support for mobile
+    if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        // Add touch events to handle mobile interactions better
+        input.addEventListener('touchstart', (e) => {
+            e.stopPropagation();
+        });
+        
+        input.addEventListener('touchend', (e) => {
+            e.stopPropagation();
+        });
+        
+        // Handle clicks outside the input on mobile
+        const handleOutsideTouch = (e) => {
+            if (!input.contains(e.target)) {
+                handleSave();
+                document.removeEventListener('touchstart', handleOutsideTouch);
+            }
+        };
+        
+        setTimeout(() => {
+            document.addEventListener('touchstart', handleOutsideTouch);
+        }, 100);
+    }
 };
 
 NodeManager.prototype.removeInlineEditor = function() {
@@ -744,20 +788,49 @@ NodeManager.prototype.deleteNode = function() {
     this.draw();
 };
 
-NodeManager.prototype.onMouseClick = function(event) {
-    console.log("Click detected!", this.selected, event.offsetX, event.offsetY);
+NodeManager.prototype.getEventCoordinates = function(event) {
+    const rect = this.canvas.getBoundingClientRect();
+    
+    if (event.type.startsWith('touch')) {
+        // Touch event
+        const touch = event.touches[0] || event.changedTouches[0];
+        return {
+            x: touch.clientX - rect.left,
+            y: touch.clientY - rect.top
+        };
+    } else {
+        // Mouse event
+        return {
+            x: event.offsetX,
+            y: event.offsetY
+        };
+    }
+};
+
+// Touch event handler
+NodeManager.prototype.onTouchStart = function(event) {
+    event.preventDefault(); // Prevent scrolling and other default behaviors
+    console.log("Touch detected!");
     
     if (this.selected == -1) {
-        console.log("Algorithm is running, click ignored");
+        console.log("Algorithm is running, touch ignored");
         return;
     }
     
+    const coords = this.getEventCoordinates(event);
+    console.log("Touch coordinates:", coords.x, coords.y);
+    
+    this.handleNodeInteraction(coords.x, coords.y);
+};
+
+// Generic node interaction handler (used by both mouse and touch)
+NodeManager.prototype.handleNodeInteraction = function(x, y) {
     this.selected = null;
     var clickedNode = null;
     
     // Usar la nueva función de detección de triángulos
     if (this.nodes.length > 0) {
-        clickedNode = this.nodes[0][0].getNodeAtPosition(event.offsetX, event.offsetY);
+        clickedNode = this.nodes[0][0].getNodeAtPosition(x, y);
         if (clickedNode) {
             this.selected = clickedNode;
             console.log("Node clicked:", clickedNode);
@@ -769,8 +842,8 @@ NodeManager.prototype.onMouseClick = function(event) {
         console.log("=== LEAF NODE CLICKED ===");
         console.log("Opening inline editor for leaf node:", clickedNode);
         console.log("Node position:", clickedNode.pos);
-        console.log("Click coordinates:", event.offsetX, event.offsetY);
-        this.showInlineEditor(clickedNode, event.offsetX, event.offsetY);
+        console.log("Click coordinates:", x, y);
+        this.showInlineEditor(clickedNode, x, y);
     } else if (clickedNode) {
         console.log("Node has children, not editable:", clickedNode.children.length);
     } else {
@@ -779,6 +852,18 @@ NodeManager.prototype.onMouseClick = function(event) {
     
     setSelectedNode(this.selected, this.selected == this.nodes[0][0]);
     this.draw();
+};
+
+NodeManager.prototype.onMouseClick = function(event) {
+    console.log("Click detected!", this.selected, event.offsetX, event.offsetY);
+    
+    if (this.selected == -1) {
+        console.log("Algorithm is running, click ignored");
+        return;
+    }
+    
+    const coords = this.getEventCoordinates(event);
+    this.handleNodeInteraction(coords.x, coords.y);
 };
 
 NodeManager.prototype.setNodeRadius = function() {
