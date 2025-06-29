@@ -214,6 +214,7 @@ Node.radius = 0;
 
 // ===== CONTROLS MANAGER =====
 function setSelectedNode(node, isRoot) {
+    // Desktop elements
     var unselectedInfo = document.getElementById("unselectedInfo");
     var nodeInfo = document.getElementById("nodeInfo");
     var deleteButton = document.getElementById("deleteNode");
@@ -221,9 +222,9 @@ function setSelectedNode(node, isRoot) {
     var nodeTypeText = document.getElementById("nodeTypeText");
     var nodeValueText = document.getElementById("nodeValueText");
     
-    // Check if elements exist before manipulating them
+    // Only proceed if desktop elements exist
     if (!unselectedInfo || !nodeInfo || !runningInfo) {
-        console.warn("Some control elements not found in DOM");
+        console.log("Desktop control elements not found - likely on mobile");
         return;
     }
     
@@ -271,9 +272,20 @@ function setSelectedNode(node, isRoot) {
 function NodeManager(canvasID) {
     console.log("Initializing NodeManager with canvas ID:", canvasID);
     
+    // Detect if mobile
+    this.isMobile = window.innerWidth <= 768 || 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    // Try to get the appropriate canvas
     this.canvas = document.getElementById(canvasID);
+    if (!this.canvas && this.isMobile) {
+        this.canvas = document.getElementById('mobileCanvas');
+    }
+    if (!this.canvas && !this.isMobile) {
+        this.canvas = document.getElementById('canvas');
+    }
+    
     if (!this.canvas) {
-        console.error(`Canvas element with ID '${canvasID}' not found`);
+        console.error(`Canvas element not found`);
         return;
     }
     
@@ -303,20 +315,17 @@ function NodeManager(canvasID) {
         this.resizeCanvas();
         setTimeout(() => this.draw(), 100);
     });
+    
+    // Canvas events
     this.canvas.addEventListener("mousedown", this.onMouseClick.bind(this));
     this.canvas.addEventListener("touchstart", this.onTouchStart.bind(this));
     
-    document.getElementById("run").addEventListener("click", this.run.bind(this));
-    document.getElementById("step").addEventListener("click", this.step.bind(this));
-    document.getElementById("stepBack").addEventListener("click", this.stepBack.bind(this));
-    document.getElementById("reset").addEventListener("click", this.reset.bind(this));
-
-    document.getElementById("addChild").addEventListener("click", this.addChild.bind(this));
-    document.getElementById("deleteNode").addEventListener("click", this.deleteNode.bind(this));
-    document.getElementById("generateTree").addEventListener("click", this.generateRandomTree.bind(this));
-    
-    // Alpha-Beta toggle event listener
-    document.getElementById("alphaBetaToggle").addEventListener("change", this.toggleAlphaBeta.bind(this));
+    // Initialize events based on device type
+    if (this.isMobile) {
+        this.initMobileEvents();
+    } else {
+        this.initDesktopEvents();
+    }
     
     // Make node_manager globally accessible for debugging
     window.testInlineEditor = () => {
@@ -331,6 +340,82 @@ function NodeManager(canvasID) {
         }
     };
 }
+
+// Initialize desktop events
+NodeManager.prototype.initDesktopEvents = function() {
+    const runBtn = document.getElementById("run");
+    const stepBtn = document.getElementById("step");
+    const stepBackBtn = document.getElementById("stepBack");
+    const resetBtn = document.getElementById("reset");
+    const addChildBtn = document.getElementById("addChild");
+    const deleteNodeBtn = document.getElementById("deleteNode");
+    const generateBtn = document.getElementById("generateTree");
+    const toggleBtn = document.getElementById("alphaBetaToggle");
+    
+    if (runBtn) runBtn.addEventListener("click", this.run.bind(this));
+    if (stepBtn) stepBtn.addEventListener("click", this.step.bind(this));
+    if (stepBackBtn) stepBackBtn.addEventListener("click", this.stepBack.bind(this));
+    if (resetBtn) resetBtn.addEventListener("click", this.reset.bind(this));
+    if (addChildBtn) addChildBtn.addEventListener("click", this.addChild.bind(this));
+    if (deleteNodeBtn) deleteNodeBtn.addEventListener("click", this.deleteNode.bind(this));
+    if (generateBtn) generateBtn.addEventListener("click", this.generateRandomTree.bind(this));
+    if (toggleBtn) toggleBtn.addEventListener("change", this.toggleAlphaBeta.bind(this));
+};
+
+// Initialize mobile events
+NodeManager.prototype.initMobileEvents = function() {
+    // Mobile controls panel toggle
+    const controlsToggle = document.getElementById("mobileControlsToggle");
+    const controlsHandle = document.getElementById("controlsHandle");
+    const mobileControls = document.getElementById("mobileControls");
+    
+    if (controlsToggle && mobileControls) {
+        controlsToggle.addEventListener("click", () => {
+            mobileControls.classList.toggle("expanded");
+            const icon = controlsToggle.querySelector("i");
+            if (icon) {
+                icon.className = mobileControls.classList.contains("expanded") ? 
+                    "fas fa-chevron-down" : "fas fa-chevron-up";
+            }
+        });
+    }
+    
+    if (controlsHandle && mobileControls) {
+        controlsHandle.addEventListener("touchstart", (e) => {
+            e.preventDefault();
+            mobileControls.classList.toggle("expanded");
+        });
+    }
+    
+    // Mobile button events
+    const mobileRunBtn = document.getElementById("mobileRun");
+    const mobileStepBtn = document.getElementById("mobileStep");
+    const mobileStepBackBtn = document.getElementById("mobileStepBack");
+    const mobileResetBtn = document.getElementById("mobileReset");
+    const mobileGenerateBtn = document.getElementById("mobileGenerate");
+    const mobileAddChildBtn = document.getElementById("mobileAddChild");
+    const mobileDeleteNodeBtn = document.getElementById("mobileDeleteNode");
+    const mobileToggleBtn = document.getElementById("mobileAlphaBetaToggle");
+    
+    if (mobileRunBtn) mobileRunBtn.addEventListener("click", this.run.bind(this));
+    if (mobileStepBtn) mobileStepBtn.addEventListener("click", this.step.bind(this));
+    if (mobileStepBackBtn) mobileStepBackBtn.addEventListener("click", this.stepBack.bind(this));
+    if (mobileResetBtn) mobileResetBtn.addEventListener("click", this.reset.bind(this));
+    if (mobileGenerateBtn) mobileGenerateBtn.addEventListener("click", this.generateRandomTree.bind(this));
+    if (mobileAddChildBtn) mobileAddChildBtn.addEventListener("click", this.addChild.bind(this));
+    if (mobileDeleteNodeBtn) mobileDeleteNodeBtn.addEventListener("click", this.deleteNode.bind(this));
+    if (mobileToggleBtn) mobileToggleBtn.addEventListener("change", this.toggleAlphaBeta.bind(this));
+    
+    // Handle orientation changes on mobile
+    if (this.isMobile) {
+        window.addEventListener('orientationchange', function() {
+            setTimeout(() => {
+                node_manager.resizeCanvas();
+                node_manager.draw();
+            }, 100);
+        });
+    }
+};
 
 // Canvas resize handler
 NodeManager.prototype.resizeCanvas = function() {
@@ -837,20 +922,25 @@ NodeManager.prototype.handleNodeInteraction = function(x, y) {
         }
     }
     
-    // Si se hizo clic en un nodo hoja (sin hijos), mostrar editor inline
-    if (clickedNode && clickedNode.children.length === 0) {
-        console.log("=== LEAF NODE CLICKED ===");
-        console.log("Opening inline editor for leaf node:", clickedNode);
-        console.log("Node position:", clickedNode.pos);
-        console.log("Click coordinates:", x, y);
-        this.showInlineEditor(clickedNode, x, y);
-    } else if (clickedNode) {
-        console.log("Node has children, not editable:", clickedNode.children.length);
+    // Handle mobile vs desktop differently
+    if (this.isMobile) {
+        // Mobile: Show node info and handle leaf node editing
+        this.showMobileNodeInfo(clickedNode);
+        
+        if (clickedNode && clickedNode.children.length === 0) {
+            console.log("=== MOBILE LEAF NODE CLICKED ===");
+            this.showMobileValueEditor(clickedNode, x, y);
+        }
     } else {
-        console.log("No node clicked");
+        // Desktop: Use existing inline editor
+        if (clickedNode && clickedNode.children.length === 0) {
+            console.log("=== DESKTOP LEAF NODE CLICKED ===");
+            this.showInlineEditor(clickedNode, x, y);
+        }
+        
+        setSelectedNode(this.selected, this.selected == this.nodes[0][0]);
     }
     
-    setSelectedNode(this.selected, this.selected == this.nodes[0][0]);
     this.draw();
 };
 
@@ -1006,9 +1096,15 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM loaded, initializing application...");
     
     try {
+        // Detect device type and initialize appropriate canvas
+        const isMobile = window.innerWidth <= 768 || 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        const canvasId = isMobile ? "mobileCanvas" : "canvas";
+        
+        console.log(`Detected device: ${isMobile ? 'Mobile' : 'Desktop'}, using canvas: ${canvasId}`);
+        
         // Initialize the node manager
         console.log("Creating NodeManager...");
-        var node_manager = new NodeManager("canvas");
+        var node_manager = new NodeManager(canvasId);
         
         if (!node_manager || !node_manager.canvas) {
             console.error("Failed to initialize NodeManager - canvas not found");
@@ -1039,3 +1135,128 @@ document.addEventListener('DOMContentLoaded', function() {
         console.error("Error during initialization:", error);
     }
 });
+
+// Mobile-specific functions
+NodeManager.prototype.showMobileNodeInfo = function(node) {
+    const mobileNodeInfo = document.getElementById("mobileNodeInfo");
+    const mobileNodeContent = document.getElementById("mobileNodeContent");
+    const mobileNodeActions = document.getElementById("mobileNodeActions");
+    
+    if (!mobileNodeInfo || !mobileNodeContent) return;
+    
+    if (node) {
+        const isLeaf = node.children.length === 0;
+        const nodeType = isLeaf ? "Hoja" : (node.max ? "MAX" : "MIN");
+        const nodeValue = node.value !== null ? node.value : "Sin valor";
+        
+        mobileNodeContent.innerHTML = `
+            <div class="fw-bold text-primary">${nodeType}</div>
+            <div class="small">Valor: ${nodeValue}</div>
+            ${node.alpha !== null ? `<div class="small text-success">α: ${node.alpha}</div>` : ''}
+            ${node.beta !== null ? `<div class="small text-danger">β: ${node.beta}</div>` : ''}
+        `;
+        
+        mobileNodeInfo.classList.add("show");
+        
+        // Show node actions if applicable
+        if (mobileNodeActions) {
+            if (this.selected === node) {
+                mobileNodeActions.classList.remove("d-none");
+            } else {
+                mobileNodeActions.classList.add("d-none");
+            }
+        }
+    } else {
+        mobileNodeContent.innerHTML = '<small class="text-muted">Toca un nodo</small>';
+        mobileNodeInfo.classList.remove("show");
+        if (mobileNodeActions) {
+            mobileNodeActions.classList.add("d-none");
+        }
+    }
+};
+
+// Mobile value editor
+NodeManager.prototype.showMobileValueEditor = function(node, x, y) {
+    console.log("=== SHOWING MOBILE VALUE EDITOR ===");
+    console.log("Node:", node, "X:", x, "Y:", y);
+    
+    // Remove existing editor
+    this.removeMobileValueEditor();
+    
+    // Create mobile input
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'mobile-value-input';
+    input.id = 'mobile-value-input';
+    input.value = node.value || '';
+    input.placeholder = 'Valor';
+    input.min = '-99';
+    input.max = '99';
+    input.inputMode = 'numeric';
+    input.pattern = '[0-9]*';
+    
+    // Position the input
+    const canvasRect = this.canvas.getBoundingClientRect();
+    const finalX = Math.min(x + canvasRect.left - 60, window.innerWidth - 130);
+    const finalY = Math.max(y + canvasRect.top - 60, 70);
+    
+    input.style.left = finalX + 'px';
+    input.style.top = finalY + 'px';
+    
+    document.body.appendChild(input);
+    
+    // Focus and select
+    setTimeout(() => {
+        input.focus();
+        input.select();
+    }, 50);
+    
+    // Handle save
+    const handleSave = () => {
+        let value = parseInt(input.value);
+        if (isNaN(value)) value = 0;
+        const clampedValue = Math.min(99, Math.max(-99, value));
+        node.value = clampedValue;
+        this.removeMobileValueEditor();
+        this.showMobileNodeInfo(node);
+        this.draw();
+    };
+    
+    // Handle cancel
+    const handleCancel = () => {
+        this.removeMobileValueEditor();
+    };
+    
+    // Events
+    input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleSave();
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            handleCancel();
+        }
+    });
+    
+    input.addEventListener('blur', handleSave);
+    
+    // Handle touch outside
+    const handleOutsideTouch = (e) => {
+        if (!input.contains(e.target) && !e.target.closest('.mobile-controls')) {
+            handleSave();
+            document.removeEventListener('touchstart', handleOutsideTouch);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('touchstart', handleOutsideTouch);
+    }, 100);
+};
+
+NodeManager.prototype.removeMobileValueEditor = function() {
+    const existingEditor = document.getElementById('mobile-value-input');
+    if (existingEditor) {
+        existingEditor.remove();
+    }
+};
